@@ -1,0 +1,24 @@
+#!/bin/bash
+# jsq - 计时器命令行工具
+
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")" 
+MAIN_PY="$SCRIPT_DIR/main.py"
+
+# 如果没有参数，显示剩余时间
+if [ $# -eq 0 ]; then
+    python3 "$MAIN_PY" status
+    exit 0
+fi
+
+# 处理参数
+case "$1" in
+    reset)
+        python3 "$MAIN_PY" reset
+        ;;
+    *)
+        echo "用法: jsq (显示状态) 或 jsq reset (重置计时器)"
+        exit 1
+        ;;
+esac
+
+exit 0

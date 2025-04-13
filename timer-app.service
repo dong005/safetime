@@ -1,0 +1,16 @@
+[Unit]
+Description=计时器应用服务
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/timer_app
+ExecStart=/usr/bin/python3 /home/timer_app/main.py indicator
+Restart=on-failure
+RestartSec=5
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/$(USER)/.Xauthority
+
+[Install]
+WantedBy=multi-user.target
