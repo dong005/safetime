@@ -9,13 +9,21 @@ fi
 
 echo "安装计时器服务..."
 
+# 获取脚本所在目录的绝对路径
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+echo "检测到安装目录: $SCRIPT_DIR"
+
 # 复制服务文件并设置权限
-cp /home/timer_app/timer-app.service /etc/systemd/system/
-chmod +x /home/timer_app/cleanup.sh
-chmod +x /home/timer_app/jsq
+cp "$SCRIPT_DIR/timer-app.service" /etc/systemd/system/
+chmod +x "$SCRIPT_DIR/cleanup.sh"
+chmod +x "$SCRIPT_DIR/jsq"
+
+# 更新服务文件中的路径
+sed -i "s|/home/timer_app|$SCRIPT_DIR|g" /etc/systemd/system/timer-app.service
 
 # 创建jsq命令链接
-ln -sf /home/timer_app/jsq /usr/local/bin/jsq
+ln -sf "$SCRIPT_DIR/jsq" /usr/local/bin/jsq
 
 # 启用并启动服务
 systemctl daemon-reload
