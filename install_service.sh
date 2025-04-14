@@ -14,13 +14,15 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 echo "检测到安装目录: $SCRIPT_DIR"
 
+# 创建临时服务文件并替换占位符
+cp "$SCRIPT_DIR/timer-app.service" "$SCRIPT_DIR/timer-app.service.tmp"
+sed -i "s|__INSTALL_PATH__|$SCRIPT_DIR|g" "$SCRIPT_DIR/timer-app.service.tmp"
+
 # 复制服务文件并设置权限
-cp "$SCRIPT_DIR/timer-app.service" /etc/systemd/system/
+cp "$SCRIPT_DIR/timer-app.service.tmp" /etc/systemd/system/timer-app.service
+rm "$SCRIPT_DIR/timer-app.service.tmp"
 chmod +x "$SCRIPT_DIR/cleanup.sh"
 chmod +x "$SCRIPT_DIR/jsq"
-
-# 更新服务文件中的路径
-sed -i "s|/home/timer_app|$SCRIPT_DIR|g" /etc/systemd/system/timer-app.service
 
 # 创建jsq命令链接
 ln -sf "$SCRIPT_DIR/jsq" /usr/local/bin/jsq

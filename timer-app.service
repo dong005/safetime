@@ -5,8 +5,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/timer_app
-ExecStart=/usr/bin/python3 /home/timer_app/main.py indicator
+WorkingDirectory=__INSTALL_PATH__
+ExecStart=/usr/bin/python3 __INSTALL_PATH__/main.py indicator
 Restart=on-failure
 RestartSec=5
 Environment=DISPLAY=:0
