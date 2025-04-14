@@ -14,13 +14,27 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 echo "检测到安装目录: $SCRIPT_DIR"
 
-# 创建临时服务文件并替换占位符
-cp "$SCRIPT_DIR/timer-app.service" "$SCRIPT_DIR/timer-app.service.tmp"
-sed -i "s|__INSTALL_PATH__|$SCRIPT_DIR|g" "$SCRIPT_DIR/timer-app.service.tmp"
+# 直接修改服务文件内容
+cat > /etc/systemd/system/timer-app.service << EOF
+[Unit]
+Description=计时器应用服务
+After=network.target
 
-# 复制服务文件并设置权限
-cp "$SCRIPT_DIR/timer-app.service.tmp" /etc/systemd/system/timer-app.service
-rm "$SCRIPT_DIR/timer-app.service.tmp"
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$SCRIPT_DIR
+ExecStart=/usr/bin/python3 $SCRIPT_DIR/main.py indicator
+Restart=on-failure
+RestartSec=5
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/\$(USER)/.Xauthority
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 设置权限
 chmod +x "$SCRIPT_DIR/cleanup.sh"
 chmod +x "$SCRIPT_DIR/jsq"
 
