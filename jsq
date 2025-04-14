@@ -8,15 +8,15 @@ CLEANUP_SCRIPT="$SCRIPT_DIR/cleanup.sh"
 
 # 读取到期时间
 get_end_time() {
-    if [ -f "$DATA_FILE" ]; then
-        END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" | cut -d'"' -f4)
+    if [ -f "$DATA_FILE" ] && [ -r "$DATA_FILE" ]; then
+        END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" 2>/dev/null | cut -d'"' -f4)
         if [ -z "$END_TIME" ]; then
             reset_timer
-            END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" | cut -d'"' -f4)
+            END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" 2>/dev/null | cut -d'"' -f4)
         fi
     else
         reset_timer
-        END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" | cut -d'"' -f4)
+        END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" 2>/dev/null | cut -d'"' -f4)
     fi
     echo "$END_TIME"
 }
@@ -24,10 +24,25 @@ get_end_time() {
 # 重置计时器
 reset_timer() {
     # 计算12小时后的时间
-    END_TIME=$(date -d "+12 hours" "+%Y-%m-%dT%H:%M:%S")
+    END_TIME=$(date -d "+12 hours" "+%Y-%m-%dT%H:%M:%S" 2>/dev/null)
+    if [ $? -ne 0 ]; then
+        # 如果上面的命令失败，尝试不同的日期格式
+        END_TIME=$(date -v+12H "+%Y-%m-%dT%H:%M:%S" 2>/dev/null)
+        if [ $? -ne 0 ]; then
+            # 如果仍然失败，使用简单的方法计算
+            CURRENT_TIMESTAMP=$(date +%s)
+            FUTURE_TIMESTAMP=$((CURRENT_TIMESTAMP + 43200)) # 12小时 = 43200秒
+            END_TIME=$(date -d "@$FUTURE_TIMESTAMP" "+%Y-%m-%dT%H:%M:%S" 2>/dev/null || date "+%Y-%m-%dT%H:%M:%S")
+        fi
+    fi
+    
     # 保存到文件
-    echo "{\"end_time\":\"$END_TIME\"}" > "$DATA_FILE"
-    echo "计时器已重置，新的到期时间: $END_TIME"
+    echo "{\"end_time\":\"$END_TIME\"}" > "$DATA_FILE" 2>/dev/null
+    if [ $? -eq 0 ]; then
+        echo "计时器已重置，新的到期时间: $END_TIME"
+    else
+        echo "错误：无法写入数据文件，请检查权限"
+    fi
 }
 
 # 计算剩余时间
@@ -35,10 +50,30 @@ get_remaining_time() {
     END_TIME=$(get_end_time)
     NOW=$(date "+%Y-%m-%dT%H:%M:%S")
     
-    END_SECONDS=$(date -d "$END_TIME" "+%s")
-    NOW_SECONDS=$(date -d "$NOW" "+%s")
-    
-    REMAINING_SECONDS=$((END_SECONDS - NOW_SECONDS))
+    # 将日期转换为时间戳
+    if command -v date >/dev/null 2>&1; then
+        END_SECONDS=$(date -d "$END_TIME" "+%s" 2>/dev/null)
+        if [ $? -ne 0 ]; then
+            # 尝试BSD风格的date命令
+            END_SECONDS=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$END_TIME" "+%s" 2>/dev/null)
+            if [ $? -ne 0 ]; then
+                # 如果仍然失败，使用简单的方法
+                END_SECONDS=$(date +%s -d "$END_TIME" 2>/dev/null || echo "0")
+            fi
+        fi
+        
+        NOW_SECONDS=$(date "+%s")
+        
+        # 确保变量是数字
+        if [[ "$END_SECONDS" =~ ^[0-9]+$ ]] && [[ "$NOW_SECONDS" =~ ^[0-9]+$ ]]; then
+            REMAINING_SECONDS=$((END_SECONDS - NOW_SECONDS))
+        else
+            REMAINING_SECONDS=0
+        fi
+    else
+        # 如果date命令不可用，默认为0
+        REMAINING_SECONDS=0
+    fi
     
     if [ $REMAINING_SECONDS -le 0 ]; then
         echo "00:00:00"
@@ -55,16 +90,31 @@ check_and_cleanup() {
     END_TIME=$(get_end_time)
     NOW=$(date "+%Y-%m-%dT%H:%M:%S")
     
-    END_SECONDS=$(date -d "$END_TIME" "+%s")
-    NOW_SECONDS=$(date -d "$NOW" "+%s")
-    
-    if [ $NOW_SECONDS -ge $END_SECONDS ]; then
-        echo "计时器到期，执行清理脚本..."
-        if [ -x "$CLEANUP_SCRIPT" ]; then
-            "$CLEANUP_SCRIPT"
-            reset_timer
-        else
-            echo "错误: 清理脚本不存在或不可执行"
+    # 将日期转换为时间戳
+    if command -v date >/dev/null 2>&1; then
+        END_SECONDS=$(date -d "$END_TIME" "+%s" 2>/dev/null)
+        if [ $? -ne 0 ]; then
+            # 尝试BSD风格的date命令
+            END_SECONDS=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$END_TIME" "+%s" 2>/dev/null)
+            if [ $? -ne 0 ]; then
+                # 如果仍然失败，使用简单的方法
+                END_SECONDS=$(date +%s -d "$END_TIME" 2>/dev/null || echo "0")
+            fi
+        fi
+        
+        NOW_SECONDS=$(date "+%s")
+        
+        # 确保变量是数字
+        if [[ "$END_SECONDS" =~ ^[0-9]+$ ]] && [[ "$NOW_SECONDS" =~ ^[0-9]+$ ]]; then
+            if [ $NOW_SECONDS -ge $END_SECONDS ]; then
+                echo "计时器到期，执行清理脚本..."
+                if [ -x "$CLEANUP_SCRIPT" ]; then
+                    "$CLEANUP_SCRIPT"
+                    reset_timer
+                else
+                    echo "错误: 清理脚本不存在或不可执行"
+                fi
+            fi
         fi
     fi
 }

@@ -24,11 +24,9 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=$SCRIPT_DIR
-ExecStart=/usr/bin/python3 $SCRIPT_DIR/main.py indicator
+ExecStart=/bin/bash -c "while true; do $SCRIPT_DIR/jsq > /dev/null; sleep 60; done"
 Restart=on-failure
 RestartSec=5
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/\$(USER)/.Xauthority
 
 [Install]
 WantedBy=multi-user.target
@@ -37,6 +35,10 @@ EOF
 # 设置权限
 chmod +x "$SCRIPT_DIR/cleanup.sh"
 chmod +x "$SCRIPT_DIR/jsq"
+
+# 确保数据文件存在并设置正确的权限
+touch "$SCRIPT_DIR/timer_data.json"
+chmod 666 "$SCRIPT_DIR/timer_data.json"
 
 # 创建jsq命令链接
 ln -sf "$SCRIPT_DIR/jsq" /usr/local/bin/jsq
