@@ -1,24 +1,98 @@
 #!/bin/bash
-# jsq - 计时器命令行工具
+# jsq - 纯Shell版计时器工具
 
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")" 
-MAIN_PY="$SCRIPT_DIR/main.py"
+# 获取脚本所在目录
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+DATA_FILE="$SCRIPT_DIR/timer_data.json"
+CLEANUP_SCRIPT="$SCRIPT_DIR/cleanup.sh"
 
-# 如果没有参数，显示剩余时间
-if [ $# -eq 0 ]; then
-    python3 "$MAIN_PY" status
-    exit 0
-fi
+# 读取到期时间
+get_end_time() {
+    if [ -f "$DATA_FILE" ]; then
+        END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" | cut -d'"' -f4)
+        if [ -z "$END_TIME" ]; then
+            reset_timer
+            END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" | cut -d'"' -f4)
+        fi
+    else
+        reset_timer
+        END_TIME=$(grep -o '"end_time":"[^"]*"' "$DATA_FILE" | cut -d'"' -f4)
+    fi
+    echo "$END_TIME"
+}
 
-# 处理参数
-case "$1" in
-    reset)
-        python3 "$MAIN_PY" reset
-        ;;
-    *)
-        echo "用法: jsq (显示状态) 或 jsq reset (重置计时器)"
-        exit 1
-        ;;
-esac
+# 重置计时器
+reset_timer() {
+    # 计算12小时后的时间
+    END_TIME=$(date -d "+12 hours" "+%Y-%m-%dT%H:%M:%S")
+    # 保存到文件
+    echo "{\"end_time\":\"$END_TIME\"}" > "$DATA_FILE"
+    echo "计时器已重置，新的到期时间: $END_TIME"
+}
 
+# 计算剩余时间
+get_remaining_time() {
+    END_TIME=$(get_end_time)
+    NOW=$(date "+%Y-%m-%dT%H:%M:%S")
+    
+    END_SECONDS=$(date -d "$END_TIME" "+%s")
+    NOW_SECONDS=$(date -d "$NOW" "+%s")
+    
+    REMAINING_SECONDS=$((END_SECONDS - NOW_SECONDS))
+    
+    if [ $REMAINING_SECONDS -le 0 ]; then
+        echo "00:00:00"
+    else
+        HOURS=$((REMAINING_SECONDS / 3600))
+        MINUTES=$(((REMAINING_SECONDS % 3600) / 60))
+        SECONDS=$((REMAINING_SECONDS % 60))
+        printf "%02d:%02d:%02d\n" $HOURS $MINUTES $SECONDS
+    fi
+}
+
+# 检查是否到期并执行清理
+check_and_cleanup() {
+    END_TIME=$(get_end_time)
+    NOW=$(date "+%Y-%m-%dT%H:%M:%S")
+    
+    END_SECONDS=$(date -d "$END_TIME" "+%s")
+    NOW_SECONDS=$(date -d "$NOW" "+%s")
+    
+    if [ $NOW_SECONDS -ge $END_SECONDS ]; then
+        echo "计时器到期，执行清理脚本..."
+        if [ -x "$CLEANUP_SCRIPT" ]; then
+            "$CLEANUP_SCRIPT"
+            reset_timer
+        else
+            echo "错误: 清理脚本不存在或不可执行"
+        fi
+    fi
+}
+
+# 主函数
+main() {
+    # 如果没有参数，显示剩余时间
+    if [ $# -eq 0 ]; then
+        check_and_cleanup
+        REMAINING=$(get_remaining_time)
+        END_TIME=$(get_end_time)
+        echo "当前到期时间: $END_TIME"
+        echo "剩余时间: $REMAINING"
+        exit 0
+    fi
+
+    # 处理参数
+    case "$1" in
+        reset)
+            reset_timer
+            ;;
+        *)
+            echo "用法: jsq (显示状态) 或 jsq reset (重置计时器)"
+            exit 1
+            ;;
+    esac
+}
+
+# 运行主函数
+main "$@"
 exit 0
